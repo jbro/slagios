@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/shlex"
@@ -13,50 +14,50 @@ import (
 const checkPrefix = "SLAGIOS_check_"
 const defaultCheckInterval = "60s"
 
-type ServiceState int
+type serviceState int
 
-func (s ServiceState) String() string {
+func (s serviceState) String() string {
 	return [...]string{"OK", "Warning", "Critical", "Unknown"}[s]
 }
 
 const (
-	OK       ServiceState = 0
-	Warning               = 1
-	Critical              = 2
-	Unknown               = 3
+	ok       serviceState = 0
+	warning               = 1
+	critical              = 2
+	unknown               = 3
 )
 
-type Check struct {
-	Name     string
-	Command  string
-	Output   string
-	State    ServiceState
-	Interval time.Duration
+type check struct {
+	name     string
+	command  string
+	output   string
+	state    serviceState
+	interval time.Duration
 }
 
-func (check Check) Run() {
-	s, err := shlex.Split(check.Command)
+func (check check) run() {
+	s, err := shlex.Split(check.command)
 	if err != nil {
 		log.Panicf("Could not parse command line: \"%s\" for %s %s",
-			check.Command, check.Name, err)
+			check.command, check.name, err)
 	}
 
-	prvState := check.State
+	prvState := check.state
 
-	log.Printf("Running %s: %s", check.Name, check.Command)
+	log.Printf("Running %s: %s", check.name, check.command)
 	c := exec.Command(s[0], s[1:]...)
 	out, _ := c.Output()
 
-	check.Output = string(out)
-	check.State = ServiceState(c.ProcessState.ExitCode())
+	check.output = string(out)
+	check.state = serviceState(c.ProcessState.ExitCode())
 
-	if prvState != check.State {
-		log.Printf("State changed %s: %s->%s", check.Name, prvState, check.State)
+	if prvState != check.state {
+		log.Printf("State changed %s: %s->%s", check.name, prvState, check.state)
 	}
 }
 
-func Load() []Check {
-	var checks []Check
+func load() []check {
+	var checks []check
 
 	interval := os.Getenv("SLAGIOS_interval")
 	if interval == "" {
@@ -79,7 +80,7 @@ func Load() []Check {
 				log.Panicf("Could not parse duration: \"%s\" for %s", interval, name)
 			}
 
-			c := Check{name, cmd, "", Unknown, dur}
+			c := check{name, cmd, "", unknown, dur}
 			checks = append(checks, c)
 
 			log.Printf("Loaded %s: %s (%s)", name, cmd, dur)
@@ -87,4 +88,29 @@ func Load() []Check {
 	}
 
 	return checks
+}
+
+func Start() {
+	checks := load()
+	var wg sync.WaitGroup
+
+	log.Println("Starting schdeuler")
+	for _, c := range checks {
+		ticker := time.NewTicker(c.interval)
+
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					c.run()
+				}
+			}
+
+		}()
+
+		log.Printf("Schdeuled %s: %s (%s)", c.name, c.command, c.interval)
+		wg.Add(1)
+	}
+
+	wg.Wait()
 }

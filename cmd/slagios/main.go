@@ -5,7 +5,5 @@ import (
 )
 
 func main() {
-	for _, c := range checks.Load() {
-		c.Run()
-	}
+	checks.Start()
 }
