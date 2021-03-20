@@ -107,6 +107,12 @@ func load() []check {
 
 func Start() {
 	checks := load()
+
+	log.Println("Establish baseline")
+	for _, c := range checks {
+		c.run()
+	}
+
 	var wg sync.WaitGroup
 
 	log.Println("Starting schdeuler")
