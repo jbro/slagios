@@ -1,7 +1,9 @@
 package checks
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -35,6 +37,13 @@ type check struct {
 	interval time.Duration
 }
 
+func (check check) notify(oldState serviceState) {
+	serviceText := strings.TrimRight(strings.Split(check.output, "\n")[0], "|")
+	buf := strings.NewReader(fmt.Sprintf("{\"text\":\"Check: %s\nCommand: %s (%s)\nChanged state %s->%s\nOutput: %s\"}",
+		check.name, check.command, check.interval, oldState, check.state, serviceText))
+	http.Post(os.Getenv("SLAGIOS_webhook"), "application/json", buf)
+}
+
 func (check *check) run() {
 	s, err := shlex.Split(check.command)
 	if err != nil {
@@ -53,6 +62,7 @@ func (check *check) run() {
 
 	if prvState != check.state {
 		log.Printf("State changed %s: %s->%s", check.name, prvState, check.state)
+		check.notify(prvState)
 	}
 }
 
@@ -109,6 +119,7 @@ func Start() {
 		wg.Add(1)
 
 		log.Printf("Schdeuled %s: %s (%s)", c.name, c.command, c.interval)
+		c.run()
 	}
 	wg.Wait()
 }
