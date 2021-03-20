@@ -74,15 +74,15 @@ func (check *check) run() {
 func load() []check {
 	var checks []check
 
-	interval := os.Getenv("SLAGIOS_interval")
-	if interval == "" {
-		interval = defaultCheckInterval
-	}
-
 	for _, e := range os.Environ() {
 		p := strings.SplitN(e, "=", 2)
 		name := p[0]
 		cmd := p[1]
+
+		interval := os.Getenv("SLAGIOS_interval")
+		if interval == "" {
+			interval = defaultCheckInterval
+		}
 
 		if strings.HasPrefix(name, checkPrefix) {
 			checkInerval := os.Getenv(strings.Replace(name, "check", "interval", 1))
