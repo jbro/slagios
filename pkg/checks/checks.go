@@ -113,18 +113,17 @@ func Start() {
 	for _, c := range checks {
 		ticker := time.NewTicker(c.interval)
 
-		go func() {
+		go func(cc check) {
+			log.Printf("Schdeuled %s: %s (%s)", cc.name, cc.command, cc.interval)
+
 			for {
 				select {
 				case <-ticker.C:
-					c.run()
+					cc.run()
 				}
 			}
-		}()
+		}(c)
 		wg.Add(1)
-
-		log.Printf("Schdeuled %s: %s (%s)", c.name, c.command, c.interval)
-		c.run()
 	}
 	wg.Wait()
 }
