@@ -39,7 +39,10 @@ type check struct {
 
 func (check check) notify(oldState serviceState) {
 	if os.Getenv("SLAGIOS_webhook") != "" {
-		serviceText := strings.TrimRight(strings.Split(check.output, "\n")[0], "|")
+		serviceText := check.output
+		serviceText = strings.Split(serviceText, "\n")[0]
+		serviceText = strings.SplitN(serviceText, "|", 2)[0]
+
 		buf := strings.NewReader(fmt.Sprintf("{\"text\":\"Check: %s\nCommand: %s (%s)\nChanged state %s->%s\nOutput: %s\"}",
 			check.name, check.command, check.interval, oldState, check.state, serviceText))
 		http.Post(os.Getenv("SLAGIOS_webhook"), "application/json", buf)
