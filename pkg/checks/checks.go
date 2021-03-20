@@ -35,7 +35,7 @@ type check struct {
 	interval time.Duration
 }
 
-func (check check) run() {
+func (check *check) run() {
 	s, err := shlex.Split(check.command)
 	if err != nil {
 		log.Panicf("Could not parse command line: \"%s\" for %s %s",
@@ -105,12 +105,10 @@ func Start() {
 					c.run()
 				}
 			}
-
 		}()
+		wg.Add(1)
 
 		log.Printf("Schdeuled %s: %s (%s)", c.name, c.command, c.interval)
-		wg.Add(1)
 	}
-
 	wg.Wait()
 }
