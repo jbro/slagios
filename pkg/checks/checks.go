@@ -47,7 +47,7 @@ func newCheck(name string, cmd string) *check {
 }
 
 func (c *check) notify(oldState serviceState) {
-	if os.Getenv("SLAGIOS_webhook") != "" {
+	if webhook, ok := os.LookupEnv("SLAGIOS_webhook"); ok {
 		serviceText := c.output
 		serviceText = strings.Split(serviceText, "\n")[0]
 		serviceText = strings.SplitN(serviceText, "|", 2)[0]
@@ -57,8 +57,8 @@ func (c *check) notify(oldState serviceState) {
 
 		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
 			c.name, oldState.emoji(), c.state.emoji(),
-			string(commandJSON), string(serviceTextJSON)))
-		http.Post(os.Getenv("SLAGIOS_webhook"), "application/json", buf)
+			string(commandJSON), string(serviceTextJSON), string(intervalJSON)))
+		http.Post(webhook, "application/json", buf)
 	}
 }
 
