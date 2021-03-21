@@ -39,8 +39,12 @@ type check struct {
 	command  string
 	output   string
 	state    serviceState
-	interval time.Duration
 	checknow chan bool
+	schedule *time.Ticker
+}
+
+func newCheck(name string, cmd string) *check {
+	return &check{name, cmd, "", ok, make(chan bool), time.NewTicker(time.Hour)}
 }
 
 func (c *check) notify(oldState serviceState) {
@@ -57,6 +61,35 @@ func (c *check) notify(oldState serviceState) {
 			string(commandJSON), string(serviceTextJSON)))
 		http.Post(os.Getenv("SLAGIOS_webhook"), "application/json", buf)
 	}
+}
+
+func (c check) resetInterval() time.Duration {
+	interval := defaultCheckInterval
+
+	if c.state == ok {
+		if value, ok := os.LookupEnv("SLAGIOS_interval"); ok {
+			interval = value
+		}
+		if value, ok := os.LookupEnv(strings.Replace(c.name, "check", "interval", 1)); ok {
+			interval = value
+		}
+	} else {
+		if value, ok := os.LookupEnv("SLAGIOS_rinterval"); ok {
+			interval = value
+		}
+		if value, ok := os.LookupEnv(strings.Replace(c.name, "check", "rinterval", 1)); ok {
+			interval = value
+		}
+	}
+
+	dur, err := time.ParseDuration(interval)
+	if err != nil {
+		log.Panicf("Could not parse duration: \"%s\" for %s", interval, c.name)
+	}
+
+	c.schedule.Reset(dur)
+
+	return dur
 }
 
 func (c *check) run() {
@@ -76,7 +109,8 @@ func (c *check) run() {
 	c.state = serviceState(cmd.ProcessState.ExitCode())
 
 	if prvState != c.state {
-		log.Printf("State changed %s: %s->%s", c.name, prvState, c.state)
+		newInterval := c.resetInterval()
+		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, newInterval)
 		c.notify(prvState)
 	}
 }
@@ -89,26 +123,11 @@ func load() []*check {
 		name := p[0]
 		cmd := p[1]
 
-		interval := os.Getenv("SLAGIOS_interval")
-		if interval == "" {
-			interval = defaultCheckInterval
-		}
-
 		if strings.HasPrefix(name, checkPrefix) {
-			checkInerval := os.Getenv(strings.Replace(name, "check", "interval", 1))
-			if checkInerval != "" {
-				interval = checkInerval
-			}
+			c := newCheck(name, cmd)
+			checks = append(checks, c)
 
-			dur, err := time.ParseDuration(interval)
-			if err != nil {
-				log.Panicf("Could not parse duration: \"%s\" for %s", interval, name)
-			}
-
-			c := check{name, cmd, "", ok, dur, make(chan bool)}
-			checks = append(checks, &c)
-
-			log.Printf("Loaded %s: %s (%s)", name, cmd, dur)
+			log.Printf("Loaded %s: %s", name, cmd)
 		}
 	}
 
@@ -122,23 +141,20 @@ func Start() {
 
 	log.Println("Starting schdeuler")
 	for _, c := range checks {
-		ticker := time.NewTicker(c.interval)
-
 		go func(cc *check) {
-			log.Printf("Schdeuled %s: %s (%s)", cc.name, cc.command, cc.interval)
+			log.Printf("Schdeuled %s: %s", cc.name, cc.command)
 
 			for {
 				select {
-				case <-ticker.C:
+				case <-cc.schedule.C:
 					cc.run()
 				case <-cc.checknow:
 					cc.run()
 				}
 			}
 		}(c)
-
 		c.checknow <- true
-
+		c.resetInterval()
 		wg.Add(1)
 	}
 

@@ -10,23 +10,28 @@ To set up a check export:
     SLAGIOS_check_<check_name>=<check_comand>
 
 where `<check_name>` could be something like "01" for the first check,
-"02" for the second etc. But `<check_name>` can be any string.
+"02" for the second etc. But `<check_name>` can be any string as long as
+it unique to a check.
 
-Optionally set the interval for a check:
+Optionally set the check and recheck interval for a check:
 
     SLAGIOS_interval_<check_name>=<check_interval>
+    SLAGIOS_rinterval_<check_name>=<check_interval>
 
 Use the same `<check_name>` as for the check command you want to change.
-`<check_interval>` is in nano seconds, but takes any string parseable by
-go's `time.ParseDuration` function. Eg. `30s`, `1min` etc.
 
 The default check interval is 60s, but this can be changed by setting:
 
-    SLAGIOS_interval=<duration>
+    SLAGIOS_interval=<check_interval>
 
-Valid values for `<duration>` are the same as above.
+The default recheck interval is 60s, but this can be changed by setting:
 
-A Slack webhook URL is required:
+    SLAGIOS_rinterval=<check_interval>
+
+`<check_interval>` is in nano seconds, but takes any string parseable by
+go's `time.ParseDuration` function. Eg. `30s`, `1min` etc.
+
+A Slack webhook URL is required if you want to send state changes to Slack:
 
     SLAGIOS_webhook=<url>
 
