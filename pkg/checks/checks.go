@@ -60,8 +60,7 @@ func (c *check) notify(oldState serviceState) {
 		intervalJSON, _ := json.Marshal(fmt.Sprintf("Check interval: %s", c.interval.String()))
 
 		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
-			c.name, oldState.emoji(), c.state.emoji(),
-			string(commandJSON), string(serviceTextJSON), string(intervalJSON)))
+			c.name, c.state.emoji(), string(commandJSON), string(serviceTextJSON), string(intervalJSON)))
 		http.Post(webhook, "application/json", buf)
 	}
 }

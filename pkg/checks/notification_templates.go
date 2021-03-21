@@ -6,7 +6,7 @@ const stateChangeTemplate = `{
 			"type": "header",
 			"text": {
 				"type": "plain_text",
-				"text": "%s: %s → %s",
+				"text": "%s: %s",
 				"emoji": true
 			}
 		},
