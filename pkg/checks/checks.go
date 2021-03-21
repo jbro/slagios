@@ -47,9 +47,9 @@ func (check check) notify(oldState serviceState) {
 		serviceText := check.output
 		serviceText = strings.Split(serviceText, "\n")[0]
 		serviceText = strings.SplitN(serviceText, "|", 2)[0]
-		serviceTextJSON, _ := json.Marshal(serviceText)
+		serviceTextJSON, _ := json.Marshal(fmt.Sprintf("Check output: `%s`", serviceText))
 
-		commandJSON, _ := json.Marshal(fmt.Sprintf("`%s`", check.command))
+		commandJSON, _ := json.Marshal(fmt.Sprintf("Check command: `%s`", check.command))
 		fmt.Println(string(serviceTextJSON))
 		fmt.Println(string(commandJSON))
 

@@ -23,9 +23,8 @@ const stateChangeTemplate = `{
 			"type": "context",
 			"elements": [
 				{
-					"type": "plain_text",
-					"text": %s,
-					"emoji": false
+					"type": "mrkdwn",
+					"text": %s
 				}
 			]
 		}
