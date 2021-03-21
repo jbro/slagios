@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,6 +21,10 @@ type serviceState int
 
 func (s serviceState) String() string {
 	return [...]string{"OK", "Warning", "Critical", "Unknown"}[s]
+}
+func (s serviceState) emoji() string {
+	return [...]string{":large_green_circle:", ":large_yellow_circle:",
+		":red_circle:", ":large_purple_circle:"}[s]
 }
 
 const (
@@ -42,9 +47,15 @@ func (check check) notify(oldState serviceState) {
 		serviceText := check.output
 		serviceText = strings.Split(serviceText, "\n")[0]
 		serviceText = strings.SplitN(serviceText, "|", 2)[0]
+		serviceTextJSON, _ := json.Marshal(serviceText)
 
-		buf := strings.NewReader(fmt.Sprintf("{\"text\":\"Check: %s\nCommand: %s (%s)\nChanged state %s->%s\nOutput: %s\"}",
-			check.name, check.command, check.interval, oldState, check.state, serviceText))
+		commandJSON, _ := json.Marshal(fmt.Sprintf("`%s`", check.command))
+		fmt.Println(string(serviceTextJSON))
+		fmt.Println(string(commandJSON))
+
+		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
+			check.name, oldState.emoji(), check.state.emoji(),
+			string(commandJSON), string(serviceTextJSON)))
 		http.Post(os.Getenv("SLAGIOS_webhook"), "application/json", buf)
 	}
 }
