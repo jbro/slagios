@@ -109,8 +109,8 @@ func Start() {
 	checks := load()
 
 	log.Println("Establish baseline")
-	for _, c := range checks {
-		c.run()
+	for i := range checks {
+		checks[i].run()
 	}
 
 	var wg sync.WaitGroup
