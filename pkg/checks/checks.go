@@ -50,8 +50,6 @@ func (check check) notify(oldState serviceState) {
 		serviceTextJSON, _ := json.Marshal(fmt.Sprintf("Check output: `%s`", serviceText))
 
 		commandJSON, _ := json.Marshal(fmt.Sprintf("Check command: `%s`", check.command))
-		fmt.Println(string(serviceTextJSON))
-		fmt.Println(string(commandJSON))
 
 		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
 			check.name, oldState.emoji(), check.state.emoji(),
