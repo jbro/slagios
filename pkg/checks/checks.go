@@ -40,6 +40,7 @@ type check struct {
 	output   string
 	state    serviceState
 	interval time.Duration
+	checknow chan bool
 }
 
 func (check check) notify(oldState serviceState) {
@@ -104,7 +105,7 @@ func load() []check {
 				log.Panicf("Could not parse duration: \"%s\" for %s", interval, name)
 			}
 
-			c := check{name, cmd, "", ok, dur}
+			c := check{name, cmd, "", ok, dur, make(chan bool)}
 			checks = append(checks, c)
 
 			log.Printf("Loaded %s: %s (%s)", name, cmd, dur)
@@ -116,11 +117,6 @@ func load() []check {
 
 func Start() {
 	checks := load()
-
-	log.Println("Establish baseline")
-	for i := range checks {
-		checks[i].run()
-	}
 
 	var wg sync.WaitGroup
 
@@ -135,9 +131,14 @@ func Start() {
 				select {
 				case <-ticker.C:
 					cc.run()
+				case <-cc.checknow:
+					cc.run()
 				}
 			}
 		}(checks[i])
+
+		checks[i].checknow <- true
+
 		wg.Add(1)
 	}
 
