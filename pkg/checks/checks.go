@@ -40,10 +40,12 @@ type check struct {
 	state    serviceState
 	checknow chan bool
 	schedule *time.Ticker
+	interval time.Duration
 }
 
 func newCheck(name string, cmd string) *check {
-	return &check{name, cmd, "", ok, make(chan bool), time.NewTicker(time.Hour)}
+	defaultDuration := time.Hour
+	return &check{name, cmd, "", ok, make(chan bool), time.NewTicker(defaultDuration), defaultDuration}
 }
 
 func (c *check) notify(oldState serviceState) {
@@ -55,6 +57,8 @@ func (c *check) notify(oldState serviceState) {
 
 		commandJSON, _ := json.Marshal(fmt.Sprintf("Check command: `%s`", c.command))
 
+		intervalJSON, _ := json.Marshal(fmt.Sprintf("Check interval: %s", c.interval.String()))
+
 		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
 			c.name, oldState.emoji(), c.state.emoji(),
 			string(commandJSON), string(serviceTextJSON), string(intervalJSON)))
@@ -62,7 +66,7 @@ func (c *check) notify(oldState serviceState) {
 	}
 }
 
-func (c check) resetInterval() time.Duration {
+func (c *check) resetInterval() {
 	interval := defaultCheckInterval
 
 	if c.state == ok {
@@ -86,9 +90,8 @@ func (c check) resetInterval() time.Duration {
 		log.Panicf("Could not parse duration: \"%s\" for %s", interval, c.name)
 	}
 
+	c.interval = dur
 	c.schedule.Reset(dur)
-
-	return dur
 }
 
 func (c *check) run() {
@@ -108,8 +111,8 @@ func (c *check) run() {
 	c.state = serviceState(cmd.ProcessState.ExitCode())
 
 	if prvState != c.state {
-		newInterval := c.resetInterval()
-		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, newInterval)
+		c.resetInterval()
+		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, c.interval)
 		c.notify(prvState)
 	}
 }
@@ -140,6 +143,8 @@ func Start() {
 
 	log.Println("Starting schdeuler")
 	for _, c := range checks {
+		c.resetInterval()
+
 		go func(cc *check) {
 			log.Printf("Schdeuled %s: %s", cc.name, cc.command)
 
@@ -152,9 +157,9 @@ func Start() {
 				}
 			}
 		}(c)
-		c.checknow <- true
-		c.resetInterval()
 		wg.Add(1)
+
+		c.checknow <- true
 	}
 
 	wg.Wait()

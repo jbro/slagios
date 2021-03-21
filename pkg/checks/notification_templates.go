@@ -27,6 +27,15 @@ const stateChangeTemplate = `{
 					"text": %s
 				}
 			]
+		},
+		{
+			"type": "context",
+			"elements": [
+				{
+					"type": "mrkdwn",
+					"text": %s
+				}
+			]
 		}
 	]
 }`
