@@ -95,7 +95,7 @@ func load() []check {
 				log.Panicf("Could not parse duration: \"%s\" for %s", interval, name)
 			}
 
-			c := check{name, cmd, "", unknown, dur}
+			c := check{name, cmd, "", ok, dur}
 			checks = append(checks, c)
 
 			log.Printf("Loaded %s: %s (%s)", name, cmd, dur)
