@@ -1,12 +1,18 @@
 package checks
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -116,6 +122,57 @@ func (c *check) run() {
 	}
 }
 
+func verifyRequest(r *http.Request) bool {
+	key := []byte(os.Getenv("SLAGIOS_signingkey"))
+	mac := hmac.New(sha256.New, key)
+
+	ts := r.Header.Get("X-Slack-Request-Timestamp")
+
+	its, _ := strconv.ParseInt(ts, 10, 64)
+	then := time.Unix(its, 0)
+	now := time.Now()
+
+	if now.Sub(then) > 5*time.Minute {
+		return false
+	}
+
+	body, _ := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+	base := []byte(fmt.Sprintf("v0:%s:%s", ts, body))
+	mac.Write(base)
+
+	sum := mac.Sum(nil)
+	signature := strings.TrimPrefix(r.Header.Get("X-Slack-Signature"), "v0=")
+	rawsiganture, _ := hex.DecodeString(signature)
+
+	return hmac.Equal(sum, rawsiganture)
+}
+
+func slashCmdHandler(w http.ResponseWriter, r *http.Request, checks []*check) {
+	switch r.Method {
+	case "POST":
+		if !verifyRequest(r) {
+			w.WriteHeader(http.StatusUnauthorized)
+			log.Printf("Unauthorized %s %s %s from %s", r.Method, r.URL.Path, r.Method, r.RemoteAddr)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			log.Printf("Could not parse form data %s %s %s from %s", r.Method, r.URL.Path, r.Method, r.RemoteAddr)
+			return
+		}
+
+		//TODO parse and dispatch request here
+
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("Unsupported method %s %s %s from %s", r.Method, r.URL.Path, r.Method, r.RemoteAddr)
+		return
+	}
+}
+
 func load() []*check {
 	var checks []*check
 
@@ -160,6 +217,15 @@ func Start() {
 
 		c.checknow <- true
 	}
+
+	go func() {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			slashCmdHandler(w, r, checks)
+		})
+
+		log.Println("Starting slash command listerner on port 80")
+		http.ListenAndServe(":80", nil)
+	}()
 
 	wg.Wait()
 }
