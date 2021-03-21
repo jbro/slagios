@@ -14,7 +14,6 @@ import (
 	"github.com/google/shlex"
 )
 
-const checkPrefix = "SLAGIOS_check_"
 const defaultCheckInterval = "60s"
 
 type serviceState int
@@ -123,7 +122,7 @@ func load() []*check {
 		name := p[0]
 		cmd := p[1]
 
-		if strings.HasPrefix(name, checkPrefix) {
+		if strings.HasPrefix(name, "SLAGIOS_check_") {
 			c := newCheck(name, cmd)
 			checks = append(checks, c)
 
