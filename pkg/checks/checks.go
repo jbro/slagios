@@ -43,46 +43,46 @@ type check struct {
 	checknow chan bool
 }
 
-func (check check) notify(oldState serviceState) {
+func (c *check) notify(oldState serviceState) {
 	if os.Getenv("SLAGIOS_webhook") != "" {
-		serviceText := check.output
+		serviceText := c.output
 		serviceText = strings.Split(serviceText, "\n")[0]
 		serviceText = strings.SplitN(serviceText, "|", 2)[0]
 		serviceTextJSON, _ := json.Marshal(fmt.Sprintf("Check output: `%s`", serviceText))
 
-		commandJSON, _ := json.Marshal(fmt.Sprintf("Check command: `%s`", check.command))
+		commandJSON, _ := json.Marshal(fmt.Sprintf("Check command: `%s`", c.command))
 
 		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
-			check.name, oldState.emoji(), check.state.emoji(),
+			c.name, oldState.emoji(), c.state.emoji(),
 			string(commandJSON), string(serviceTextJSON)))
 		http.Post(os.Getenv("SLAGIOS_webhook"), "application/json", buf)
 	}
 }
 
-func (check *check) run() {
-	s, err := shlex.Split(check.command)
+func (c *check) run() {
+	s, err := shlex.Split(c.command)
 	if err != nil {
 		log.Panicf("Could not parse command line: \"%s\" for %s %s",
-			check.command, check.name, err)
+			c.command, c.name, err)
 	}
 
-	prvState := check.state
+	prvState := c.state
 
-	log.Printf("Running %s: %s", check.name, check.command)
-	c := exec.Command(s[0], s[1:]...)
-	out, _ := c.Output()
+	log.Printf("Running %s: %s", c.name, c.command)
+	cmd := exec.Command(s[0], s[1:]...)
+	out, _ := cmd.Output()
 
-	check.output = string(out)
-	check.state = serviceState(c.ProcessState.ExitCode())
+	c.output = string(out)
+	c.state = serviceState(cmd.ProcessState.ExitCode())
 
-	if prvState != check.state {
-		log.Printf("State changed %s: %s->%s", check.name, prvState, check.state)
-		check.notify(prvState)
+	if prvState != c.state {
+		log.Printf("State changed %s: %s->%s", c.name, prvState, c.state)
+		c.notify(prvState)
 	}
 }
 
-func load() []check {
-	var checks []check
+func load() []*check {
+	var checks []*check
 
 	for _, e := range os.Environ() {
 		p := strings.SplitN(e, "=", 2)
@@ -106,7 +106,7 @@ func load() []check {
 			}
 
 			c := check{name, cmd, "", ok, dur, make(chan bool)}
-			checks = append(checks, c)
+			checks = append(checks, &c)
 
 			log.Printf("Loaded %s: %s (%s)", name, cmd, dur)
 		}
@@ -121,10 +121,10 @@ func Start() {
 	var wg sync.WaitGroup
 
 	log.Println("Starting schdeuler")
-	for i := range checks {
-		ticker := time.NewTicker(checks[i].interval)
+	for _, c := range checks {
+		ticker := time.NewTicker(c.interval)
 
-		go func(cc check) {
+		go func(cc *check) {
 			log.Printf("Schdeuled %s: %s (%s)", cc.name, cc.command, cc.interval)
 
 			for {
@@ -135,9 +135,9 @@ func Start() {
 					cc.run()
 				}
 			}
-		}(checks[i])
+		}(c)
 
-		checks[i].checknow <- true
+		c.checknow <- true
 
 		wg.Add(1)
 	}
