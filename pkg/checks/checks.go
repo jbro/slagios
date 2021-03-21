@@ -125,8 +125,8 @@ func Start() {
 	var wg sync.WaitGroup
 
 	log.Println("Starting schdeuler")
-	for _, c := range checks {
-		ticker := time.NewTicker(c.interval)
+	for i := range checks {
+		ticker := time.NewTicker(checks[i].interval)
 
 		go func(cc check) {
 			log.Printf("Schdeuled %s: %s (%s)", cc.name, cc.command, cc.interval)
@@ -137,8 +137,9 @@ func Start() {
 					cc.run()
 				}
 			}
-		}(c)
+		}(checks[i])
 		wg.Add(1)
 	}
+
 	wg.Wait()
 }
