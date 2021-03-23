@@ -122,55 +122,76 @@ func (c *check) run() {
 	}
 }
 
-func verifyRequest(r *http.Request) bool {
-	key := []byte(os.Getenv("SLAGIOS_signingkey"))
-	mac := hmac.New(sha256.New, key)
+func requestVerifier(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-	ts := r.Header.Get("X-Slack-Request-Timestamp")
-
-	its, _ := strconv.ParseInt(ts, 10, 64)
-	then := time.Unix(its, 0)
-	now := time.Now()
-
-	if now.Sub(then) > 5*time.Minute {
-		return false
-	}
-
-	body, _ := ioutil.ReadAll(r.Body)
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	base := []byte(fmt.Sprintf("v0:%s:%s", ts, body))
-	mac.Write(base)
-
-	sum := mac.Sum(nil)
-	signature := strings.TrimPrefix(r.Header.Get("X-Slack-Signature"), "v0=")
-	rawsiganture, _ := hex.DecodeString(signature)
-
-	return hmac.Equal(sum, rawsiganture)
-}
-
-func slashCmdHandler(w http.ResponseWriter, r *http.Request, checks []*check) {
-	switch r.Method {
-	case "POST":
-		if !verifyRequest(r) {
-			w.WriteHeader(http.StatusUnauthorized)
-			log.Printf("Unauthorized %s %s %s from %s", r.Method, r.URL.Path, r.Method, r.RemoteAddr)
+		if r.Method != "POST" {
+			http.Error(w, fmt.Sprintf("Method not allowd: %s", r.Method), http.StatusMethodNotAllowed)
 			return
 		}
 
+		key := []byte(os.Getenv("SLAGIOS_signingkey"))
+		mac := hmac.New(sha256.New, key)
+
+		ts := r.Header.Get("X-Slack-Request-Timestamp")
+
+		its, _ := strconv.ParseInt(ts, 10, 64)
+		then := time.Unix(its, 0)
+		now := time.Now()
+
+		if now.Sub(then) > 5*time.Minute {
+			http.Error(w, "Unauthorised: expired", http.StatusUnauthorized)
+			return
+		}
+
+		body, _ := ioutil.ReadAll(r.Body)
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+		base := []byte(fmt.Sprintf("v0:%s:%s", ts, body))
+		mac.Write(base)
+
+		sum := mac.Sum(nil)
+		signature := r.Header.Get("X-Slack-Signature")
+		signature = strings.TrimPrefix(signature, "v0=")
+		rawsiganture, _ := hex.DecodeString(signature)
+
+		if !hmac.Equal(sum, rawsiganture) {
+			http.Error(w, "Unauthorised: invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+type loggerStatusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (l *loggerStatusResponseWriter) WriteHeader(statusCode int) {
+	l.ResponseWriter.WriteHeader(statusCode)
+	l.statusCode = statusCode
+}
+
+func logger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		l := loggerStatusResponseWriter{w, http.StatusOK}
+		next.ServeHTTP(&l, r)
+		log.Printf("Request from %s %s %s %s %d %s", r.RemoteAddr, r.Method, r.RequestURI, r.Proto, l.statusCode, r.UserAgent())
+
+	})
+}
+
+func slashCmdHandler(checks []*check) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			log.Printf("Could not parse form data %s %s %s from %s", r.Method, r.URL.Path, r.Method, r.RemoteAddr)
+			http.Error(w, "Bad request: could not parse form data", http.StatusBadRequest)
 			return
 		}
 
 		//TODO parse and dispatch request here
-
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		log.Printf("Unsupported method %s %s %s from %s", r.Method, r.URL.Path, r.Method, r.RemoteAddr)
-		return
-	}
+	})
 }
 
 func load() []*check {
@@ -219,9 +240,10 @@ func Start() {
 	}
 
 	go func() {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			slashCmdHandler(w, r, checks)
-		})
+		handler := slashCmdHandler(checks)
+		verifier := requestVerifier(handler)
+		logging := logger(verifier)
+		http.Handle("/", logging)
 
 		log.Println("Starting slash command listerner on port 80")
 		http.ListenAndServe(":80", nil)
