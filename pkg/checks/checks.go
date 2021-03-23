@@ -167,6 +167,7 @@ func requestVerifier(next http.Handler) http.Handler {
 type loggerStatusResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
+	response   string
 }
 
 func (l *loggerStatusResponseWriter) WriteHeader(statusCode int) {
@@ -174,12 +175,18 @@ func (l *loggerStatusResponseWriter) WriteHeader(statusCode int) {
 	l.statusCode = statusCode
 }
 
+func (l *loggerStatusResponseWriter) Write(p []byte) (int, error) {
+	l.response += strings.TrimSpace(string(p))
+	return l.ResponseWriter.Write(p)
+}
+
 func logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		l := loggerStatusResponseWriter{w, http.StatusOK}
-		next.ServeHTTP(&l, r)
-		log.Printf("Request from %s %s %s %s %d %s", r.RemoteAddr, r.Method, r.RequestURI, r.Proto, l.statusCode, r.UserAgent())
+		l := loggerStatusResponseWriter{w, http.StatusOK, ""}
 
+		next.ServeHTTP(&l, r)
+
+		log.Printf("Request from %s %s %s %s %d \"%s\" \"%s\"", r.RemoteAddr, r.Method, r.RequestURI, r.Proto, l.statusCode, l.response, r.UserAgent())
 	})
 }
 
