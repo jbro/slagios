@@ -55,7 +55,7 @@ func newCheck(name string, cmd string) *check {
 	return &check{name, cmd, "", ok, time.Now(), make(chan bool), time.NewTicker(defaultDuration), defaultDuration}
 }
 
-func (c *check) notify(oldState serviceState) {
+func (c *check) notify() {
 	if webhook, ok := os.LookupEnv("SLAGIOS_webhook"); ok {
 		serviceText := c.output
 		serviceText = strings.Split(serviceText, "\n")[0]
@@ -121,7 +121,7 @@ func (c *check) run() {
 		c.lastCheck = time.Now()
 		c.resetInterval()
 		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, c.interval)
-		c.notify(prvState)
+		c.notify()
 	}
 }
 
