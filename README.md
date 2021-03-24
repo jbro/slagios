@@ -35,10 +35,17 @@ A Slack webhook URL is required if you want to send state changes to Slack:
 
     SLAGIOS_webhook=<url>
 
+To enable a slash command create the slash command a point it at the
+exposed port (port 80 internally), and set the following environment
+variable with you Slack App secret key:
+
+    SLAGIOS_signingkey=<signing_secret>
+
+
 To run the docker image create a file containing environment variables as
 described above, and run:
 
-    docker run --name slagios --rm --env-file env jbros/slagios
+    docker run --name slagios --rm --env-file env -p 8000:80 jbros/slagios
 
 ## Building
 
