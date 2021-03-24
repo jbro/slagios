@@ -55,8 +55,8 @@ func newCheck(name string, cmd string) *check {
 	return &check{name, cmd, "", ok, time.Now(), make(chan bool), time.NewTicker(defaultDuration), defaultDuration}
 }
 
-func (c *check) notify() {
-	if webhook, ok := os.LookupEnv("SLAGIOS_webhook"); ok {
+func (c *check) notify(webhook string) {
+	if len(webhook) > 0 {
 		serviceText := c.output
 		serviceText = strings.Split(serviceText, "\n")[0]
 		serviceText = strings.SplitN(serviceText, "|", 2)[0]
@@ -122,7 +122,8 @@ func (c *check) run() {
 	if prvState != c.state {
 		c.resetInterval()
 		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, c.interval)
-		c.notify()
+
+		c.notify(os.Getenv("SLAGIO_webhook"))
 	}
 }
 
@@ -217,7 +218,7 @@ func slashCmdHandler(checks map[string]*check) http.Handler {
 					r.FormValue("user_name"), r.FormValue("user_id"), r.FormValue("channel_name"), r.FormValue("channel_id"))
 
 				for _, c := range checks {
-					c.notify()
+					c.notify(r.FormValue("response_url"))
 				}
 			}
 		}
