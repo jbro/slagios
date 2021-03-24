@@ -40,18 +40,19 @@ const (
 )
 
 type check struct {
-	name     string
-	command  string
-	output   string
-	state    serviceState
-	checknow chan bool
-	schedule *time.Ticker
-	interval time.Duration
+	name      string
+	command   string
+	output    string
+	state     serviceState
+	lastCheck time.Time
+	checknow  chan bool
+	schedule  *time.Ticker
+	interval  time.Duration
 }
 
 func newCheck(name string, cmd string) *check {
 	defaultDuration := time.Hour
-	return &check{name, cmd, "", ok, make(chan bool), time.NewTicker(defaultDuration), defaultDuration}
+	return &check{name, cmd, "", ok, time.Now(), make(chan bool), time.NewTicker(defaultDuration), defaultDuration}
 }
 
 func (c *check) notify(oldState serviceState) {
@@ -63,7 +64,8 @@ func (c *check) notify(oldState serviceState) {
 
 		commandJSON, _ := json.Marshal(fmt.Sprintf("Check command: `%s`", c.command))
 
-		intervalJSON, _ := json.Marshal(fmt.Sprintf("Check interval: %s", c.interval.String()))
+		nextCheck := c.lastCheck.Add(c.interval).Sub(time.Now()).Round(time.Second)
+		intervalJSON, _ := json.Marshal(fmt.Sprintf("Lastcheck: %s\nNext check in: %s", c.lastCheck.Format(time.RFC3339), nextCheck))
 
 		buf := strings.NewReader(fmt.Sprintf(stateChangeTemplate,
 			c.name, c.state.emoji(), string(commandJSON), string(serviceTextJSON), string(intervalJSON)))
@@ -116,6 +118,7 @@ func (c *check) run() {
 	c.state = serviceState(cmd.ProcessState.ExitCode())
 
 	if prvState != c.state {
+		c.lastCheck = time.Now()
 		c.resetInterval()
 		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, c.interval)
 		c.notify(prvState)
