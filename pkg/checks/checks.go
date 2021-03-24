@@ -202,7 +202,7 @@ func slashCmdHandler(checks map[string]*check) http.Handler {
 		}
 
 		switch r.FormValue("command") {
-		case "/slagiostest":
+		case os.Getenv("SLAGIOS_slashcmd"):
 
 			switch r.FormValue("text") {
 			case "check":
