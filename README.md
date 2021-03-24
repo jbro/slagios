@@ -38,10 +38,10 @@ A Slack webhook URL is required if you want to send state changes to Slack:
 To run the docker image create a file containing environment variables as
 described above, and run:
 
-    docker run --name slagios --rm --env-file env hal9kdk/slagios
+    docker run --name slagios --rm --env-file env jbros/slagios
 
 ## Building
 
 To build the docker image:
 
-    docker build -t hal9kdk/slagios .
+    docker build -t jbros/slagios .
