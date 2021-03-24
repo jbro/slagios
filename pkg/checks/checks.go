@@ -213,6 +213,9 @@ func slashCmdHandler(checks map[string]*check) http.Handler {
 				for _, c := range checks {
 					c.checknow <- true
 				}
+
+				buf := strings.NewReader("{\"text\": \"Rechecking\"}")
+				http.Post(r.FormValue("response_url"), "application/json", buf)
 			default:
 				log.Printf("Status requested by %s (%s) in %s (%s)",
 					r.FormValue("user_name"), r.FormValue("user_id"), r.FormValue("channel_name"), r.FormValue("channel_id"))
