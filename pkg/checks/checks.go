@@ -194,19 +194,38 @@ func logger(next http.Handler) http.Handler {
 	})
 }
 
-func slashCmdHandler(checks []*check) http.Handler {
+func slashCmdHandler(checks map[string]*check) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Bad request: could not parse form data", http.StatusBadRequest)
 			return
 		}
 
-		//TODO parse and dispatch request here
+		switch r.FormValue("command") {
+		case "/slagiostest":
+
+			switch r.FormValue("text") {
+			case "check":
+				log.Printf("Recheck requested by %s (%s) in %s (%s)",
+					r.FormValue("user_name"), r.FormValue("user_id"), r.FormValue("channel_name"), r.FormValue("channel_id"))
+
+				for _, c := range checks {
+					c.checknow <- true
+				}
+			default:
+				log.Printf("Status requested by %s (%s) in %s (%s)",
+					r.FormValue("user_name"), r.FormValue("user_id"), r.FormValue("channel_name"), r.FormValue("channel_id"))
+
+				for _, c := range checks {
+					c.notify()
+				}
+			}
+		}
 	})
 }
 
-func load() []*check {
-	var checks []*check
+func load() map[string]*check {
+	var checks = make(map[string]*check)
 
 	for _, e := range os.Environ() {
 		p := strings.SplitN(e, "=", 2)
@@ -215,7 +234,7 @@ func load() []*check {
 
 		if strings.HasPrefix(name, "SLAGIOS_check_") {
 			c := newCheck(name, cmd)
-			checks = append(checks, c)
+			checks[name] = c
 
 			log.Printf("Loaded %s: %s", name, cmd)
 		}
