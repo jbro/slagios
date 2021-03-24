@@ -123,7 +123,7 @@ func (c *check) run() {
 		c.resetInterval()
 		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, c.interval)
 
-		c.notify(os.Getenv("SLAGIO_webhook"))
+		c.notify(os.Getenv("SLAGIOS_webhook"))
 	}
 }
 
