@@ -117,8 +117,9 @@ func (c *check) run() {
 	c.output = string(out)
 	c.state = serviceState(cmd.ProcessState.ExitCode())
 
+	c.lastCheck = time.Now()
+
 	if prvState != c.state {
-		c.lastCheck = time.Now()
 		c.resetInterval()
 		log.Printf("State changed %s: %s->%s, rechecking in %s", c.name, prvState, c.state, c.interval)
 		c.notify()
