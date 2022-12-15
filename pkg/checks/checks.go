@@ -252,12 +252,12 @@ func Start() {
 
 	var wg sync.WaitGroup
 
-	log.Println("Starting schdeuler")
+	log.Println("Starting scheduler")
 	for _, c := range checks {
 		c.resetInterval()
 
 		go func(cc *check) {
-			log.Printf("Schdeuled %s: %s", cc.name, cc.command)
+			log.Printf("Scheduled %s: %s", cc.name, cc.command)
 
 			for {
 				select {
@@ -279,7 +279,7 @@ func Start() {
 		logging := logger(verifier)
 		http.Handle("/", logging)
 
-		log.Println("Starting slash command listerner on port 80")
+		log.Println("Starting slash command listener on port 80")
 		http.ListenAndServe(":80", nil)
 	}()
 
